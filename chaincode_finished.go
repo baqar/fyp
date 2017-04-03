@@ -92,7 +92,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 	} else if function == "write" {
 		return t.write(stub, args)
 	} else if function == "init_claim" {
-		return t.write(stub, args)
+		return t.init_claim(stub, args)
 	}
 	fmt.Println("invoke did not find func: " + function)
 
@@ -158,7 +158,7 @@ func (t *SimpleChaincode) init_claim(stub shim.ChaincodeStubInterface, args []st
 	var err error
 
 	//   0       1      2
-	//  "100",    "1",  "100"
+	//  "100",    "1",  "150"
 	if len(args) != 3 {
 		return nil, errors.New("Incorrect number of arguments. Expecting 4")
 	}
