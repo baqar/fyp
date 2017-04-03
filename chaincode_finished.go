@@ -42,8 +42,8 @@ type Customer struct{
 type SmartClaim struct{
 	Id string `json:"id"`					//the fieldtags are needed to keep case from bouncing around
 	CustomerId string `json:"customerId"`
-	TxDate int64 `json:"txDate"`
-	TxAmount string `json:"txAmount"`
+	ClaimDate int64 `json:"claimDate"`
+	ClaimAmount string `json:"claimAmount"`
 }
 
 
@@ -177,27 +177,27 @@ func (t *SimpleChaincode) init_claim(stub shim.ChaincodeStubInterface, args []st
 	if len(args[3]) <= 0 {
 		return nil, errors.New("4th argument must be a non-empty string")
 	}
-	txId := args[0]
+	claimId := args[0]
 	customerId := args[1]
 	amount := args[2]
-	txDate := makeTimestamp()
+	claimDate := makeTimestamp()
 
 	//check if marble already exists
-	marbleAsBytes, err := stub.GetState(txId)
+	marbleAsBytes, err := stub.GetState(claimId)
 	if err != nil {
 		return nil, errors.New("Failed to get marble name")
 	}
 	res := SmartClaim{}
 	json.Unmarshal(marbleAsBytes, &res)
-	if res.Id == txId{
-		fmt.Println("This claim arleady exists: " + txId)
+	if res.Id == claimId{
+		fmt.Println("This claim arleady exists: " + claimId)
 		fmt.Println(res);
 		return nil, errors.New("This claim arleady exists")				//all stop a claim by this name exists
 	}
 	
 	//build the claim json string manually
-	str := `{"id": "` + txId + `", "customerId": "` + customerId + `", "txAmount": ` + amount + `, "txDate": "` + strconv.FormatInt(txDate, 10) + `"}`
-	err = stub.PutState(txId, []byte(str))									//store marble with id as key
+	str := `{"id": "` + claimId + `", "customerId": "` + customerId + `", "claimAmount": ` + amount + `, "claimDate": "` + strconv.FormatInt(claimDate, 10) + `"}`
+	err = stub.PutState(claimId, []byte(str))									//store marble with id as key
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (t *SimpleChaincode) init_claim(stub shim.ChaincodeStubInterface, args []st
 	json.Unmarshal(claimsAsBytes, &claimIndex)							//un stringify it aka JSON.parse()
 	
 	//append
-	claimIndex = append(claimIndex, txId)								//add claim id to index list
+	claimIndex = append(claimIndex, claimId)								//add claim id to index list
 	fmt.Println("! claim index: ", claimIndex)
 	jsonAsBytes, _ := json.Marshal(claimIndex)
 	err = stub.PutState(claimIndexStr, jsonAsBytes)						//store id of claim
