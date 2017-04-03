@@ -19,13 +19,33 @@ package main
 import (
 	"errors"
 	"fmt"
-
+	"strconv"
+	"encoding/json"
+	"time"
+	
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
 // SimpleChaincode example simple Chaincode implementation
 type SimpleChaincode struct {
 }
+
+var claimIndexStr = "_claimindex"				//name for the key/value that will store a list of all known SmartClaims
+
+
+type Customer struct{
+	Id string `json:"id"`					//the fieldtags are needed to keep case from bouncing around
+	FirstName string `json:"firstName"`
+	LastName string `json:"lastName"`
+}
+
+type SmartClaim struct{
+	Id string `json:"id"`					//the fieldtags are needed to keep case from bouncing around
+	CustomerId string `json:"customerId"`
+	TxDate int64 `json:"txDate"`
+	TxAmount string `json:"txAmount"`
+}
+
 
 func main() {
 	err := shim.Start(new(SimpleChaincode))
@@ -34,13 +54,27 @@ func main() {
 	}
 }
 
+func (t *SimpleChaincode) Run(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+	fmt.Println("run is running " + function)
+	return t.Invoke(stub, function, args)
+}
+
 // Init resets all the things
 func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string, args []string) ([]byte, error) {
+	var Aval int
+	var err error
+
 	if len(args) != 1 {
 		return nil, errors.New("Incorrect number of arguments. Expecting 1")
 	}
+		
+	Aval, err = strconv.Atoi(args[0])
+	if err != nil {
+		return nil, errors.New("Expecting integer value for asset holding")
+	}
 
-	err := stub.PutState("hello_world_fyp", []byte(args[0]))
+	// Write the state to the ledger
+	err = stub.PutState("abc", []byte(strconv.Itoa(Aval))) 		//making a test var "abc", I find it handy to read/write to it right away to test the network
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +90,8 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 	if function == "init" {
 		return t.Init(stub, "init", args)
 	} else if function == "write" {
+		return t.write(stub, args)
+	} else if function == "init_claim" {
 		return t.write(stub, args)
 	}
 	fmt.Println("invoke did not find func: " + function)
@@ -112,4 +148,82 @@ func (t *SimpleChaincode) read(stub shim.ChaincodeStubInterface, args []string) 
 	}
 
 	return valAsbytes, nil
+}
+
+
+// ============================================================================================================================
+// Init Marble - create a new marble, store into chaincode state
+// ============================================================================================================================
+func (t *SimpleChaincode) init_claim(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	var err error
+
+	//   0       1      2
+	//  "100",    "1",  "100"
+	if len(args) != 3 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 4")
+	}
+
+	//input sanitation
+	fmt.Println("- start init claim")
+	if len(args[0]) <= 0 {
+		return nil, errors.New("1st argument must be a non-empty string")
+	}
+	if len(args[1]) <= 0 {
+		return nil, errors.New("2nd argument must be a non-empty string")
+	}
+	if len(args[2]) <= 0 {
+		return nil, errors.New("3rd argument must be a non-empty string")
+	}
+	if len(args[3]) <= 0 {
+		return nil, errors.New("4th argument must be a non-empty string")
+	}
+	txId := args[0]
+	customerId := args[1]
+	amount := args[2]
+	txDate := makeTimestamp()
+
+	//check if marble already exists
+	marbleAsBytes, err := stub.GetState(txId)
+	if err != nil {
+		return nil, errors.New("Failed to get marble name")
+	}
+	res := SmartClaim{}
+	json.Unmarshal(marbleAsBytes, &res)
+	if res.Id == txId{
+		fmt.Println("This claim arleady exists: " + txId)
+		fmt.Println(res);
+		return nil, errors.New("This claim arleady exists")				//all stop a claim by this name exists
+	}
+	
+	//build the claim json string manually
+	str := `{"id": "` + txId + `", "customerId": "` + customerId + `", "txAmount": ` + amount + `, "txDate": "` + strconv.FormatInt(txDate, 10) + `"}`
+	err = stub.PutState(txId, []byte(str))									//store marble with id as key
+	if err != nil {
+		return nil, err
+	}
+		
+	//get the claim index
+	claimsAsBytes, err := stub.GetState(claimIndexStr)
+	if err != nil {
+		return nil, errors.New("Failed to get claim index")
+	}
+	var claimIndex []string
+	json.Unmarshal(claimsAsBytes, &claimIndex)							//un stringify it aka JSON.parse()
+	
+	//append
+	claimIndex = append(claimIndex, txId)								//add claim id to index list
+	fmt.Println("! claim index: ", claimIndex)
+	jsonAsBytes, _ := json.Marshal(claimIndex)
+	err = stub.PutState(claimIndexStr, jsonAsBytes)						//store id of claim
+
+	fmt.Println("- end init claim")
+	return nil, nil
+}
+
+
+// ============================================================================================================================
+// Make Timestamp - create a timestamp in ms
+// ============================================================================================================================
+func makeTimestamp() int64 {
+    return time.Now().UnixNano() / (int64(time.Millisecond)/int64(time.Nanosecond))
 }
