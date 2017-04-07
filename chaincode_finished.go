@@ -160,7 +160,7 @@ func (t *SimpleChaincode) init_claim(stub shim.ChaincodeStubInterface, args []st
 	//   0       1      2
 	//  "100",    "1",  "150"
 	if len(args) != 3 {
-		return nil, errors.New("Incorrect number of arguments. Expecting 4")
+		return nil, errors.New("Incorrect number of arguments. Expecting 3")
 	}
 
 	//input sanitation
@@ -174,9 +174,7 @@ func (t *SimpleChaincode) init_claim(stub shim.ChaincodeStubInterface, args []st
 	if len(args[2]) <= 0 {
 		return nil, errors.New("3rd argument must be a non-empty string")
 	}
-	if len(args[3]) <= 0 {
-		return nil, errors.New("4th argument must be a non-empty string")
-	}
+
 	claimId := args[0]
 	customerId := args[1]
 	amount := args[2]
