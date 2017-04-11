@@ -31,12 +31,15 @@ type SimpleChaincode struct {
 }
 
 var claimIndexStr = "_claimindex"				//name for the key/value that will store a list of all known SmartClaims
-
+var customerIndexStr = "_customerindex"	
 
 type Customer struct{
 	Id string `json:"id"`					//the fieldtags are needed to keep case from bouncing around
 	FirstName string `json:"firstName"`
 	LastName string `json:"lastName"`
+	UserName string `json:"userName"`
+	Password string `json:"password"`
+	CreationDate int64 `json:"creationDate"`
 }
 
 type SmartClaim struct{
@@ -91,6 +94,8 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface, function stri
 		return t.Init(stub, "init", args)
 	} else if function == "write" {
 		return t.write(stub, args)
+	} else if function == "init_customer" {
+		return t.init_customer(stub, args)
 	} else if function == "init_claim" {
 		return t.init_claim(stub, args)
 	}
@@ -150,9 +155,84 @@ func (t *SimpleChaincode) read(stub shim.ChaincodeStubInterface, args []string) 
 	return valAsbytes, nil
 }
 
+// ============================================================================================================================
+// Init Customer - create a new customer, store into chaincode state
+// ============================================================================================================================
+func (t *SimpleChaincode) init_customer(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
+	var err error
+
+	//   0       1        2        3       4
+	//  "1",  "baqar", "naqvi", "bn100", "pass"
+	if len(args) != 5 {
+		return nil, errors.New("Incorrect number of arguments. Expecting 3")
+	}
+
+	//input sanitation
+	fmt.Println("- start init claim")
+	if len(args[0]) <= 0 {
+		return nil, errors.New("1st argument must be a non-empty string")
+	}
+	if len(args[1]) <= 0 {
+		return nil, errors.New("2nd argument must be a non-empty string")
+	}
+	if len(args[2]) <= 0 {
+		return nil, errors.New("3rd argument must be a non-empty string")
+	}
+	if len(args[3]) <= 0 {
+		return nil, errors.New("3rd argument must be a non-empty string")
+	}
+	if len(args[4]) <= 0 {
+		return nil, errors.New("3rd argument must be a non-empty string")
+	}
+
+	customerId := args[0]
+	firstName := args[1]
+	lastName := args[2]
+	userName := args[3]
+	password := args[4]
+	creationDate := makeTimestamp()
+
+	//check if customer already exists
+	customerAsBytes, err := stub.GetState(customerId)
+	if err != nil {
+		return nil, errors.New("Failed to get customer name")
+	}
+	res := Customer{}
+	json.Unmarshal(customerAsBytes, &res)
+	if res.Id == customerId{
+		fmt.Println("This customer arleady exists: " + customerId)
+		fmt.Println(res);
+		return nil, errors.New("This customer arleady exists")				//all stop a claim by this name exists
+	}
+	
+	//build the claim json string manually
+	str := `{"id": "` + customerId + `", "firstName": "` + firstName + `", "lastName": ` + lastName + `", "userName": ` + userName + `", "password": ` + password + `, "creationDate": "` + strconv.FormatInt(creationDate, 10) + `"}`
+	err = stub.PutState(customerId, []byte(str))									//store marble with id as key
+	if err != nil {
+		return nil, err
+	}
+		
+	//get the claim index
+	customerAsBytes, err = stub.GetState(customerIndexStr)
+	if err != nil {
+		return nil, errors.New("Failed to get customer index")
+	}
+	var customerIndex []string
+	json.Unmarshal(customerAsBytes, &customerIndex)							//un stringify it aka JSON.parse()
+	
+	//append
+	customerIndex = append(customerIndex, customerId)								//add claim id to index list
+	fmt.Println("! claim index: ", customerIndex)
+	jsonAsBytes, _ := json.Marshal(customerIndex)
+	err = stub.PutState(customerIndexStr, jsonAsBytes)						//store id of claim
+
+	fmt.Println("- end init customer")
+	return nil, nil
+}
+
 
 // ============================================================================================================================
-// Init Marble - create a new marble, store into chaincode state
+// Init Claim - create a new claim, store into chaincode state
 // ============================================================================================================================
 func (t *SimpleChaincode) init_claim(stub shim.ChaincodeStubInterface, args []string) ([]byte, error) {
 	var err error
@@ -183,7 +263,7 @@ func (t *SimpleChaincode) init_claim(stub shim.ChaincodeStubInterface, args []st
 	//check if marble already exists
 	marbleAsBytes, err := stub.GetState(claimId)
 	if err != nil {
-		return nil, errors.New("Failed to get marble name")
+		return nil, errors.New("Failed to get claim name")
 	}
 	res := SmartClaim{}
 	json.Unmarshal(marbleAsBytes, &res)
