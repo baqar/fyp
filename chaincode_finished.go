@@ -89,13 +89,6 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string
 		return nil, err
 	}
 	
-	var customers
-	jsonAsBytes, _ = json.Marshal(customers)								//clear the open trade struct
-	err = stub.PutState(customerIndexStr, jsonAsBytes)
-	if err != nil {
-		return nil, err
-	}
-
 	return nil, nil
 }
 
