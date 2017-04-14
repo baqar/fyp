@@ -81,6 +81,20 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface, function string
 	if err != nil {
 		return nil, err
 	}
+	
+	var empty []string
+	jsonAsBytes, _ := json.Marshal(empty)								//marshal an emtpy array of strings to clear the index
+	err = stub.PutState(claimIndexStr, jsonAsBytes)
+	if err != nil {
+		return nil, err
+	}
+	
+	var customers
+	jsonAsBytes, _ = json.Marshal(customers)								//clear the open trade struct
+	err = stub.PutState(customerIndexStr, jsonAsBytes)
+	if err != nil {
+		return nil, err
+	}
 
 	return nil, nil
 }
@@ -164,7 +178,7 @@ func (t *SimpleChaincode) init_customer(stub shim.ChaincodeStubInterface, args [
 	//   0       1        2        3       4
 	//  "1",  "baqar", "naqvi", "bn100", "pass"
 	if len(args) != 5 {
-		return nil, errors.New("Incorrect number of arguments. Expecting 3")
+		return nil, errors.New("Incorrect number of arguments. Expecting 5")
 	}
 
 	//input sanitation
@@ -179,10 +193,10 @@ func (t *SimpleChaincode) init_customer(stub shim.ChaincodeStubInterface, args [
 		return nil, errors.New("3rd argument must be a non-empty string")
 	}
 	if len(args[3]) <= 0 {
-		return nil, errors.New("3rd argument must be a non-empty string")
+		return nil, errors.New("4th argument must be a non-empty string")
 	}
 	if len(args[4]) <= 0 {
-		return nil, errors.New("3rd argument must be a non-empty string")
+		return nil, errors.New("5th argument must be a non-empty string")
 	}
 
 	customerId := args[0]
@@ -200,9 +214,9 @@ func (t *SimpleChaincode) init_customer(stub shim.ChaincodeStubInterface, args [
 	res := Customer{}
 	json.Unmarshal(customerAsBytes, &res)
 	if res.Id == customerId{
-		fmt.Println("This customer arleady exists: " + customerId)
+		fmt.Println("This customer already exists: " + customerId)
 		fmt.Println(res);
-		return nil, errors.New("This customer arleady exists")				//all stop a claim by this name exists
+		return nil, errors.New("This customer already exists")				//all stop a claim by this name exists
 	}
 	
 	//build the claim json string manually
@@ -221,7 +235,7 @@ func (t *SimpleChaincode) init_customer(stub shim.ChaincodeStubInterface, args [
 	json.Unmarshal(customerAsBytes, &customerIndex)							//un stringify it aka JSON.parse()
 	
 	//append
-	customerIndex = append(customerIndex, customerId)								//add claim id to index list
+	customerIndex = append(customerIndex, customerId)								//add customer id to index list
 	fmt.Println("! claim index: ", customerIndex)
 	jsonAsBytes, _ := json.Marshal(customerIndex)
 	err = stub.PutState(customerIndexStr, jsonAsBytes)						//store id of claim
